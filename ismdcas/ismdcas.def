@@ -1,0 +1,3 @@
+LIBRARY ismdcas.dll
+EXPORTS
+ part2

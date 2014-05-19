@@ -1,0 +1,28 @@
+[ uuid (7e9ec4c0-1854-11d4-96f8-000001007681),
+  version(1.0)
+]
+interface callAny
+{
+cpp_quote("#define CA_FLAG_IN  1")
+cpp_quote("#define CA_FLAG_OUT 2")
+cpp_quote("#define CA_FLAG_PTR 4")
+
+struct par
+{
+ unsigned int flags;
+ unsigned int size,buf;
+ [unique,size_is(size),length_is(buf)] unsigned char *data;
+};
+struct exec
+{
+ unsigned long retCode;
+ unsigned long lastError;
+};
+
+long callAny([in] handle_t session,
+             [in,string] wchar_t *path,[in,string] char *fn,
+	     int n,[in,out,size_is(n),ref] struct par *p,
+	     [out,ref,size_is(1)] struct exec *e);
+long getInfo([in] handle_t session,
+             [out,string,size_is(260)] wchar_t *provider);
+}

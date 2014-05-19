@@ -1,0 +1,107 @@
+rpc client's description.
+
+you see rpc's iface as 3 fns:
+
+dw WINAPI caClose(han connection);     //that's obviously
+/*
+ returns: rpc status.                  //mean, ERROR_SUCCESS if oK
+*/
+han WINAPI caConnectW(WCHAR *host,WCHAR *port=0,WCHAR *protocol=0);
+han WINAPI caConnectA(const char *host,const char *port=0,const char *protocol=0);
+/*
+ returns:
+  !=0 -- connection handle; must be closed with caClose after all
+  ==0 -- use GetLastError to obtain status of failure
+*/
+
+connection must be made before execution of anything else to obtain a handle.
+host, port & protocol are described in TXT file.txt :)
+moreover, thou can check more protocols & port formats in RPC help --
+it will support 'em all :)
+
+dw WINAPI caExecW(han connection,const WCHAR *dllPath,const char *fn,int nPar,par *p,void *retcode=0);
+dw WINAPI caExecA(han connection,const char *dllPath,const char *fn,int nPar,par *p,void *retcode=0);
+/*
+ returns:
+   > 0 -- call executed remotely;
+          *retcode contains fn's retcode, GetLastError set up properly
+  == 0 -- call failed remotely -- library or entrypoint not found;
+          GetLastError set up properly
+  ==-1 -- remote call exception; GetLastError contains exception code
+  ==-2 -- local exception; GetLastError contains exception code
+            possibly directional flags set up incorrectly,
+            causing writing into const etc...
+
+ on enter:
+  connection, dllPath, fn, nPar && p MUST be valid (othw. -- -2);
+  each p's flags, size & data MUST be valid
+*/
+
+this call is made upon a handle to a successfull connection.
+dllPath, fn & retcode are obvious in usage (you even may drop the last, though
+i think you won't -- that's the value returned by remote fn :)
+nPar denotes count of parameters in par *p;
+each parameter is described as follows:
+struct  par
+    {
+    unsigned int flags; //control flags, see later
+    unsigned int size;  //that is the buffer size in bytes
+    unsigned int buf;   //do not use or change it -- that's MINE :)
+    /* [length_is][size_is][unique] */ unsigned char __RPC_FAR *data;
+    };                  //pointer to data. thou may even insert here
+    a constant string, but mark it as IN only (not OUT, or you'll get GP:).
+
+flags are:
+
+#define CA_FLAG_IN  1
+#define CA_FLAG_OUT 2
+#define CA_FLAG_PTR 4
+
+IN & OUT denotes how the data is transmitted
+PTR has the following meaning:
+ if PTR is checked, address of supplied buffer is passed into fn
+ if PTR is not, dword supplied in the buffer is passed into fn
+
+ ex: fn(char *x);//suppose a is in/out
+     then
+      char x[BUFSIZ]="ldfjgslgj";
+      par a={7,BUFSIZ,0,(BYTE*)x};
+     will be good
+ ex: fn(int x);//x is obviously in only
+     then
+      int x=10;
+      par a={1,sizeof(int),0,(BYTE*)&x};
+     will be good
+     but if (and only if) thou want to pass a 0 value in, thou may use
+      par a={5,0,0,0};
+     guess why :)))
+ ex: fn(int *x);//let x be out only
+     then
+      int x;
+      par a={6,sizeof(int),0,(BYTE*)&x};
+     will be the only choice.
+thou may also refer to client.cpp under rpc/client
+what else?
+ ex: fn(UNICODE_STRING *x);
+     that ain't a trouble yet :) i'd solve this like that:
+      BYTE x[sizeof(UNICODE_STRING)+BUFSIZ*sizeof(WCHAR)];
+      //that's right, 'cuz UNICODE_STRING struct has an even size,
+      //conseq. buffer will be word-aligned
+      ((UNICODE_STRING*)a)->Buffer=(WCHAR*)(a+sizeof(UNICODE_STRING));
+      .....
+      par a={7,sizeof(x),0,x};
+     d'yew like it? :)
+thou may need multistep scheme to pass in/out a complex struct --
+that is allocate buffer, copy data there, exec fn, copy data back
+& free buffer. (but i ain't got to deal with this yet :)
+also note, that all errors & memory leaks will happen remotely,
+in the bounds of one server, so it's possible that the fault of
+one fn will interfere with another
+
+server's ListenUp is not included as call into ismd2 'cuz i think
+a best usage of it, is to start under some admin, but not LS, in
+order to have more than only one machine that we already do :)
+ListenUp parameters are the same as command line server's
+
+with best regards,                                      dumb
+                                                        ^..^
